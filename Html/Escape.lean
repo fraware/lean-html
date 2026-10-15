@@ -19,8 +19,20 @@ def escapeChar (c : Char) : String :=
   | '"' => "&quot;"
   | c    => String.singleton c
 
+/-- XML 1.0 Fifth Edition's Char production, including permitted whitespace. -/
+def isXml10Char (c : Char) : Bool :=
+  let u := c.toNat
+  u == 0x9 || u == 0xA || u == 0xD ||
+    decide (0x20 ≤ u ∧ u ≤ 0xD7FF) ||
+    decide (0xE000 ≤ u ∧ u ≤ 0xFFFD) ||
+    decide (0x10000 ≤ u ∧ u ≤ 0x10FFFF)
+
+/-- Replace code points excluded by XML 1.0 without affecting legal characters. -/
+def xml10SafeChar (c : Char) : Char :=
+  if isXml10Char c then c else '�'
+
 def escape (s : String) : String :=
-  String.join (s.toList.map escapeChar)
+  String.join (s.toList.map fun c => escapeChar (xml10SafeChar c))
 
 /-- Render one attribute as `name="escaped value"`, with a leading space
 so callers can concatenate these directly after a tag name. -/
@@ -142,8 +154,8 @@ escaped attribute values and escaped text content safe against markup
 breakout, given a renderer that keeps the escaped value between its two
 literal `"` delimiters. -/
 theorem escape_safe (s : String) : ∀ c ∈ (escape s).toList, c ≠ '<' ∧ c ≠ '>' ∧ c ≠ '"' :=
-  join_map_safe escapeChar s.toList fun c0 _ c hc => by
-    have h := escapeChar_clean c0 c hc
+  join_map_safe (fun c => escapeChar (xml10SafeChar c)) s.toList fun c0 _ c hc => by
+    have h := escapeChar_clean (xml10SafeChar c0) c hc
     unfold isDangerous at h
     simp only [Bool.or_eq_false_iff, beq_eq_false_iff_ne, ne_eq] at h
     exact ⟨h.1.1, h.1.2, h.2⟩
