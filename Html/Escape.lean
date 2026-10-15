@@ -79,10 +79,29 @@ def AttrFragment.render (dialect : Dialect) : AttrFragment → String
     | .html5 => s!" {sanitizeAttrName name}"
     | .xhtml => renderAttr (sanitizeAttrName name) (sanitizeAttrName name)
 
-/-- Render an attribute list to a string. This is the single choke point
-that makes any `Attrs` value safe to splice directly after a tag name. -/
-def Attrs.render (attrs : Attrs) (dialect : Dialect := .html5) : String :=
+/-- Names are compared after sanitization, since distinct inputs can render identically. -/
+def AttrFragment.name : AttrFragment → String
+  | .value name _ => name
+  | .flag name => name
+
+/-- Keep the first fragment for each serialized name, preserving input order. -/
+def Attrs.uniqueGo (seen : List String) : Attrs → Attrs
+  | [] => []
+  | f :: rest =>
+    let name := sanitizeAttrName f.name
+    if seen.contains name then uniqueGo seen rest
+    else f :: uniqueGo (name :: seen) rest
+
+def Attrs.unique (attrs : Attrs) : Attrs := Attrs.uniqueGo [] attrs
+
+/-- Serialize a list of fragments, without resolving duplicate names. -/
+def Attrs.renderFragments (attrs : Attrs) (dialect : Dialect := .html5) : String :=
   String.join (attrs.map (AttrFragment.render dialect))
+
+/-- Render with one attribute per sanitized name, first occurrence winning.
+This applies even to arbitrary `Attrs` passed directly to `Node.element`. -/
+def Attrs.render (attrs : Attrs) (dialect : Dialect := .html5) : String :=
+  Attrs.renderFragments (Attrs.unique attrs) dialect
 
 /-- A single required `name="value"` attribute. -/
 def reqAttr (name value : String) : Attrs := [.value name value]
@@ -238,19 +257,19 @@ a raw `<` or `>`; every name goes through `sanitizeAttrName_safe`, every
 value through `escape_safe`. -/
 theorem Attrs.render_safe (attrs : Attrs) (dialect : Dialect := .html5) :
     ∀ c ∈ (Attrs.render attrs dialect).toList, c ≠ '<' ∧ c ≠ '>' :=
-  join_map_safe _ attrs fun f _ => AttrFragment.render_safe dialect f
+  join_map_safe _ (Attrs.unique attrs) fun f _ => AttrFragment.render_safe dialect f
 
 /-- **The attribute-shape theorem:** every string `Attrs.render` produces is a
 well-formed run of attributes for the dialect it was asked for. At `.xhtml`
 this is the stronger claim, `WellFormedAttrs` having no bare flag there. -/
-theorem Attrs.render_wellFormed (attrs : Attrs) (dialect : Dialect := .html5) :
-    WellFormedAttrs dialect (Attrs.render attrs dialect) := by
+private theorem Attrs.renderFragments_wellFormed (attrs : Attrs) (dialect : Dialect := .html5) :
+    WellFormedAttrs dialect (Attrs.renderFragments attrs dialect) := by
   induction attrs with
-  | nil => simpa [Attrs.render] using WellFormedAttrs.nil (d := dialect)
+  | nil => simpa [Attrs.renderFragments] using WellFormedAttrs.nil (d := dialect)
   | cons f rest ih =>
-    have hcons : Attrs.render (f :: rest) dialect
-        = f.render dialect ++ Attrs.render rest dialect := by
-      simp [Attrs.render]
+    have hcons : Attrs.renderFragments (f :: rest) dialect
+        = f.render dialect ++ Attrs.renderFragments rest dialect := by
+      simp [Attrs.renderFragments]
     rw [hcons]
     cases f with
     | value name val =>
@@ -269,5 +288,10 @@ theorem Attrs.render_wellFormed (attrs : Attrs) (dialect : Dialect := .html5) :
             = " " ++ sanitizeAttrName name ++ "=\"" ++ escape (sanitizeAttrName name) ++ "\"" := rfl
         rw [heq]
         exact .value (sanitizeAttrName_isAttrName name) (escape_safe (sanitizeAttrName name)) ih
+
+/-- The public renderer preserves the fragment-shape theorem after deduplication. -/
+theorem Attrs.render_wellFormed (attrs : Attrs) (dialect : Dialect := .html5) :
+    WellFormedAttrs dialect (Attrs.render attrs dialect) :=
+  Attrs.renderFragments_wellFormed (Attrs.unique attrs) dialect
 
 end Html
