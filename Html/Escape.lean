@@ -89,13 +89,13 @@ def Attrs.uniqueGo (seen : List String) : Attrs → Attrs
   | [] => []
   | f :: rest =>
     let name := sanitizeAttrName f.name
-    if seen.contains name then uniqueGo seen rest
-    else f :: uniqueGo (name :: seen) rest
+    if seen.contains name then Attrs.uniqueGo seen rest
+    else f :: Attrs.uniqueGo (name :: seen) rest
 
 def Attrs.unique (attrs : Attrs) : Attrs := Attrs.uniqueGo [] attrs
 
 /-- Serialize a list of fragments, without resolving duplicate names. -/
-def Attrs.renderFragments (attrs : Attrs) (dialect : Dialect := .html5) : String :=
+private def Attrs.renderFragments (attrs : Attrs) (dialect : Dialect := .html5) : String :=
   String.join (attrs.map (AttrFragment.render dialect))
 
 /-- Render with one attribute per sanitized name, first occurrence winning.
