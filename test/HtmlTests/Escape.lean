@@ -35,13 +35,12 @@ theorem renderAttr_safe (name value : String) :
       ∀ c ∈ (escape value).toList, c ≠ '<' ∧ c ≠ '>' ∧ c ≠ '"' :=
   ⟨rfl, escape_safe value⟩
 
-/-- Serialization before duplicate resolution remains compositional; the public
-renderer deliberately is not compositional when the two lists share names. -/
-theorem attrsRenderFragments_append (a b : Attrs) (dialect : Dialect) :
-    Attrs.renderFragments (a ++ b) dialect =
-      Attrs.renderFragments a dialect ++ Attrs.renderFragments b dialect := by
-  unfold Attrs.renderFragments
-  rw [List.map_append, String.join_append]
+/-- When two fragments have the same serialized name, the first wins, in
+either output dialect. The earlier unconditional append law cannot hold. -/
+theorem attrsRender_firstWins (first second : String) (dialect : Dialect) :
+    Attrs.render [.value "id" first, .value "id" second] dialect =
+      Attrs.render [.value "id" first] dialect := by
+  rfl
 
 #guard Attrs.render [.value "id" "first", .value "id" "second"] .xhtml =
   " id=\"first\""
