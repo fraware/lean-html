@@ -19,6 +19,18 @@ open Html
 #guard escape "&<>\"" = "&amp;&lt;&gt;&quot;"
 #guard escape "&amp;" = "&amp;amp;"  -- already-escaped input isn't special-cased; re-escaping & first is correct
 
+-- XML 1.0 excludes most C0 controls and the BMP noncharacters FFFE/FFFF.
+-- Its Char production retains TAB, LF and CR, which must remain untouched.
+#guard escape (String.singleton (Char.ofNat 0)) = "�"
+#guard escape (String.singleton (Char.ofNat 0x1F)) = "�"
+#guard escape (String.singleton (Char.ofNat 0xFFFE)) = "�"
+#guard escape (String.singleton (Char.ofNat 0xFFFF)) = "�"
+#guard escape (String.singleton (Char.ofNat 0x9)) = "\t"
+#guard escape (String.singleton (Char.ofNat 0xA)) = "\n"
+#guard escape (String.singleton (Char.ofNat 0xD)) = "\r"
+#guard escape "héllo 日本語" = "héllo 日本語"
+#guard renderAttr "title" (String.singleton (Char.ofNat 0)) = " title=\"�\""
+
 /-- **Compositionality:** escaping two fragments and concatenating the results
 is the same as escaping their concatenation directly. No double-escaping
 and no under-escaping happens at the fragment boundary. -/
