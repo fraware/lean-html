@@ -35,14 +35,26 @@ theorem renderAttr_safe (name value : String) :
       ∀ c ∈ (escape value).toList, c ≠ '<' ∧ c ≠ '>' ∧ c ≠ '"' :=
   ⟨rfl, escape_safe value⟩
 
-/-- **Compositionality of attribute rendering:** an `Attrs` list renders to the
-concatenation of its parts' renderings. Every `<Tag>Attrs.render` in
-`Html/Attrs.lean` is a `++` chain over the primitives below, so this plus the
-primitive laws pins down each record's output without enumerating its fields. -/
-theorem attrsRender_append (a b : Attrs) (dialect : Dialect) :
-    Attrs.render (a ++ b) dialect = Attrs.render a dialect ++ Attrs.render b dialect := by
-  unfold Attrs.render
+/-- Serialization before duplicate resolution remains compositional; the public
+renderer deliberately is not compositional when the two lists share names. -/
+theorem attrsRenderFragments_append (a b : Attrs) (dialect : Dialect) :
+    Attrs.renderFragments (a ++ b) dialect =
+      Attrs.renderFragments a dialect ++ Attrs.renderFragments b dialect := by
+  unfold Attrs.renderFragments
   rw [List.map_append, String.join_append]
+
+#guard Attrs.render [.value "id" "first", .value "id" "second"] .xhtml =
+  " id=\"first\""
+#guard Attrs.render [.value "id" "first", .value "id" "second"] .html5 =
+  " id=\"first\""
+#guard Attrs.render [.value "a b" "first", .value "a_b" "second"] .xhtml =
+  " a_b=\"first\""
+#guard Attrs.render [.flag "hidden", .value "hidden" "override"] .xhtml =
+  " hidden=\"hidden\""
+#guard Attrs.render [.value "id" "first", .flag "id"] .html5 =
+  " id=\"first\""
+#guard Attrs.render (reqAttr "id" "first" ++ [.value "id" "second"]) .xhtml =
+  Attrs.render (reqAttr "id" "first") .xhtml
 
 theorem attrsRender_reqAttr (name value : String) (dialect : Dialect) :
     Attrs.render (reqAttr name value) dialect = renderAttr (sanitizeAttrName name) value := by
