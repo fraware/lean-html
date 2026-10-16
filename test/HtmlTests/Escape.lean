@@ -40,7 +40,10 @@ either output dialect. The earlier unconditional append law cannot hold. -/
 theorem attrsRender_firstWins (first second : String) (dialect : Dialect) :
     Attrs.render [.value "id" first, .value "id" second] dialect =
       Attrs.render [.value "id" first] dialect := by
-  rfl
+  cases dialect <;>
+    simp [Attrs.render, Attrs.unique, Attrs.uniqueGo, AttrFragment.nameKey,
+      AttrFragment.name, asciiLowerAttrChar, sanitizeAttrName,
+      sanitizeAttrNameChar, isAttrNameChar, isAttrNameStartChar]
 
 #guard Attrs.render [.value "id" "first", .value "id" "second"] .xhtml =
   " id=\"first\""
@@ -52,36 +55,42 @@ theorem attrsRender_firstWins (first second : String) (dialect : Dialect) :
   " hidden=\"hidden\""
 #guard Attrs.render [.value "id" "first", .flag "id"] .html5 =
   " id=\"first\""
+#guard Attrs.render [.value "id" "first", .value "ID" "second"] .html5 =
+  " id=\"first\""
+#guard Attrs.render [.value "id" "first", .value "ID" "second"] .xhtml =
+  " id=\"first\" ID=\"second\""
+#guard Attrs.render [.value "ID" "first", .value "id" "second"] .html5 =
+  " ID=\"first\""
 #guard Attrs.render (reqAttr "id" "first" ++ [.value "id" "second"]) .xhtml =
   Attrs.render (reqAttr "id" "first") .xhtml
 
 theorem attrsRender_reqAttr (name value : String) (dialect : Dialect) :
     Attrs.render (reqAttr name value) dialect = renderAttr (sanitizeAttrName name) value := by
-  simp [Attrs.render, reqAttr, AttrFragment.render]
+  simp [Attrs.render, Attrs.unique, Attrs.uniqueGo, reqAttr, AttrFragment.render]
 
 theorem attrsRender_optAttr_none (name : String) (dialect : Dialect) :
     Attrs.render (optAttr name none) dialect = "" := by
-  simp [Attrs.render, optAttr]
+  simp [Attrs.render, Attrs.unique, Attrs.uniqueGo, optAttr]
 
 theorem attrsRender_optAttr_some (name value : String) (dialect : Dialect) :
     Attrs.render (optAttr name (some value)) dialect = renderAttr (sanitizeAttrName name) value := by
-  simp [Attrs.render, optAttr, AttrFragment.render]
+  simp [Attrs.render, Attrs.unique, Attrs.uniqueGo, optAttr, AttrFragment.render]
 
 /-- A `false` boolean attribute contributes nothing at all: never `name="false"`,
 which the HTML spec reads as the attribute being *present*, hence true. -/
 theorem attrsRender_flagAttr_false (name : String) (dialect : Dialect) :
     Attrs.render (flagAttr name false) dialect = "" := by
-  simp [Attrs.render, flagAttr]
+  simp [Attrs.render, Attrs.unique, Attrs.uniqueGo, flagAttr]
 
 theorem attrsRender_flagAttr_true_html5 (name : String) :
     Attrs.render (flagAttr name true) .html5 = " " ++ sanitizeAttrName name := by
-  simp [Attrs.render, flagAttr, AttrFragment.render, toString]
+  simp [Attrs.render, Attrs.unique, Attrs.uniqueGo, flagAttr, AttrFragment.render, toString]
 
 /-- The same attribute in XML, where a bare name isn't well-formed: HTML5 reads
 `name="name"` as present, so the two renderings agree on meaning. -/
 theorem attrsRender_flagAttr_true_xhtml (name : String) :
     Attrs.render (flagAttr name true) .xhtml
       = renderAttr (sanitizeAttrName name) (sanitizeAttrName name) := by
-  simp [Attrs.render, flagAttr, AttrFragment.render]
+  simp [Attrs.render, Attrs.unique, Attrs.uniqueGo, flagAttr, AttrFragment.render]
 
 end HtmlTests
