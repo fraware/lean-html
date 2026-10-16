@@ -42,7 +42,7 @@ theorem attrsRender_firstWins (first second : String) (dialect : Dialect) :
       Attrs.render [.value "id" first] dialect := by
   cases dialect <;>
     simp [Attrs.render, Attrs.unique, Attrs.uniqueGo, AttrFragment.nameKey,
-      AttrFragment.name, asciiLowerAttrChar, sanitizeAttrName,
+      AttrFragment.name, sanitizeAttrName,
       sanitizeAttrNameChar, isAttrNameChar, isAttrNameStartChar]
 
 #guard Attrs.render [.value "id" "first", .value "id" "second"] .xhtml =
