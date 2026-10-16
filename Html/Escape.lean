@@ -84,24 +84,35 @@ def AttrFragment.name : AttrFragment → String
   | .value name _ => name
   | .flag name => name
 
+/-- ASCII lowercasing for HTML attribute-name comparison. -/
+def asciiLowerAttrChar (c : Char) : Char :=
+  if 65 ≤ c.toNat ∧ c.toNat ≤ 90 then Char.ofNat (c.toNat + 32) else c
+
+/-- HTML5 compares ASCII attribute names without case; XML preserves case. -/
+def AttrFragment.nameKey (dialect : Dialect) (f : AttrFragment) : String :=
+  let name := sanitizeAttrName f.name
+  match dialect with
+  | .html5 => name.map asciiLowerAttrChar
+  | .xhtml => name
+
 /-- Keep the first fragment for each serialized name, preserving input order. -/
-def Attrs.uniqueGo (seen : List String) : Attrs → Attrs
+def Attrs.uniqueGo (dialect : Dialect) (seen : List String) : Attrs → Attrs
   | [] => []
   | f :: rest =>
-    let name := sanitizeAttrName f.name
-    if seen.contains name then Attrs.uniqueGo seen rest
-    else f :: Attrs.uniqueGo (name :: seen) rest
+    let name := f.nameKey dialect
+    if seen.contains name then Attrs.uniqueGo dialect seen rest
+    else f :: Attrs.uniqueGo dialect (name :: seen) rest
 
-def Attrs.unique (attrs : Attrs) : Attrs := Attrs.uniqueGo [] attrs
+def Attrs.unique (attrs : Attrs) (dialect : Dialect := .html5) : Attrs :=
+  Attrs.uniqueGo dialect [] attrs
 
 /-- Serialize a list of fragments, without resolving duplicate names. -/
 private def Attrs.renderFragments (attrs : Attrs) (dialect : Dialect := .html5) : String :=
   String.join (attrs.map (AttrFragment.render dialect))
 
-/-- Render with one attribute per sanitized name, first occurrence winning.
-This applies even to arbitrary `Attrs` passed directly to `Node.element`. -/
+/-- Render each sanitized name once; the first fragment takes precedence. -/
 def Attrs.render (attrs : Attrs) (dialect : Dialect := .html5) : String :=
-  Attrs.renderFragments (Attrs.unique attrs) dialect
+  String.join ((Attrs.unique attrs dialect).map (AttrFragment.render dialect))
 
 /-- A single required `name="value"` attribute. -/
 def reqAttr (name value : String) : Attrs := [.value name value]
@@ -256,8 +267,9 @@ fragments an `Attrs` value contains, `Attrs.render`'s output never contains
 a raw `<` or `>`; every name goes through `sanitizeAttrName_safe`, every
 value through `escape_safe`. -/
 theorem Attrs.render_safe (attrs : Attrs) (dialect : Dialect := .html5) :
-    ∀ c ∈ (Attrs.render attrs dialect).toList, c ≠ '<' ∧ c ≠ '>' :=
-  join_map_safe _ (Attrs.unique attrs) fun f _ => AttrFragment.render_safe dialect f
+    ∀ c ∈ (Attrs.render attrs dialect).toList, c ≠ '<' ∧ c ≠ '>' := by
+  exact join_map_safe _ (Attrs.unique attrs dialect) fun f _ =>
+    AttrFragment.render_safe dialect f
 
 /-- **The attribute-shape theorem:** every string `Attrs.render` produces is a
 well-formed run of attributes for the dialect it was asked for. At `.xhtml`
@@ -291,7 +303,7 @@ private theorem Attrs.renderFragments_wellFormed (attrs : Attrs) (dialect : Dial
 
 /-- The public renderer preserves the fragment-shape theorem after deduplication. -/
 theorem Attrs.render_wellFormed (attrs : Attrs) (dialect : Dialect := .html5) :
-    WellFormedAttrs dialect (Attrs.render attrs dialect) :=
-  Attrs.renderFragments_wellFormed (Attrs.unique attrs) dialect
+    WellFormedAttrs dialect (Attrs.render attrs dialect) := by
+  exact Attrs.renderFragments_wellFormed (Attrs.unique attrs dialect) dialect
 
 end Html
