@@ -49,7 +49,7 @@ def page : String :=
 - `Node.render_wellFormed`: given no `Node.unsafeRaw`, rendering always produces balanced tags, with no unescaped `<` or `>` anywhere outside a tag's own delimiters. At `(dialect := .xhtml)` the same theorem says the output is well-formed XML: every tag closed or self-closed, every attribute given a value.
 - `escape_safe`: escaped text and attribute values never contain a raw `<`, `>`, or `"`, so neither can break out of the markup around it.
 - `sanitizeAttrName_safe` and `sanitizeAttrName_start`: every attribute name is coerced to a valid XML `Name`, which is what makes an untrusted name in `rawAttrs` harmless.
-- `Attrs.render_safe` and `Attrs.render_wellFormed`: whatever fragments an `Attrs` value holds, it renders to a run of ` name="value"` pairs, bare boolean flags being admitted under `.html5` only.
+- `Attrs.render` keeps the first fragment for each attribute name. HTML5 compares ASCII names case-insensitively; XHTML preserves case. `Attrs.render_safe` and `Attrs.render_wellFormed` still describe that run (bare boolean flags under `.html5` only). Unique names are not full XML well-formedness: illegal characters, unbound prefixes, and raw tag names are outside this property.
 - `element_wellFormed`, `text_wellFormed`, and their siblings: `Node.WellFormed` is compositional, so you can discharge it for a tree of your own by chaining one lemma per constructor it was built from, tag functions included.
 
 These cover `Node.render`, not `Node.renderPretty`, whose interposed indentation would need a side condition on `unit`. They constrain neither a tag name handed to `Node.element` directly (the tag functions all pass literals) nor `Node.unsafeRaw`, which is trusted by construction.
